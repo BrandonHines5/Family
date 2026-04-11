@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Basketball Stats Tracker</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header>
+  <h1>🏀 Basketball Stats Tracker</h1>
+  <div class="player-bar">
+    <label for="playerName">Player:</label>
+    <input type="text" id="playerName" placeholder="Player name" />
+    <button id="savePlayer" class="secondary">Save</button>
+  </div>
+</header>
+
+<main>
+  <section class="card" id="liveGameCard">
+    <div class="card-header">
+      <h2>Live Game</h2>
+      <span id="gameStatus" class="status">No game in progress</span>
+    </div>
+
+    <div id="newGameForm">
+      <div class="form-row">
+        <input type="text" id="opponent" placeholder="Opponent (e.g. Tigers)" />
+        <input type="date" id="gameDate" />
+        <button id="startGame">Start Game</button>
+      </div>
+    </div>
+
+    <div id="liveGame" class="hidden">
+      <div class="game-header">
+        <div>
+          <strong id="liveOpponent"></strong>
+          <span id="liveDate" class="muted"></span>
+        </div>
+        <div class="big-score"><span id="livePoints">0</span> PTS</div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-box" data-stat="ftm">
+          <div class="stat-label">Free Throws</div>
+          <div class="stat-value"><span id="ftm">0</span> / <span id="fta">0</span></div>
+          <div class="stat-buttons">
+            <button class="make" data-action="make" data-type="ft">Make +1</button>
+            <button class="miss" data-action="miss" data-type="ft">Miss</button>
+          </div>
+        </div>
+
+        <div class="stat-box" data-stat="fg2">
+          <div class="stat-label">2-Pointers</div>
+          <div class="stat-value"><span id="fg2m">0</span> / <span id="fg2a">0</span></div>
+          <div class="stat-buttons">
+            <button class="make" data-action="make" data-type="fg2">Make +2</button>
+            <button class="miss" data-action="miss" data-type="fg2">Miss</button>
+          </div>
+        </div>
+
+        <div class="stat-box" data-stat="fg3">
+          <div class="stat-label">3-Pointers</div>
+          <div class="stat-value"><span id="fg3m">0</span> / <span id="fg3a">0</span></div>
+          <div class="stat-buttons">
+            <button class="make" data-action="make" data-type="fg3">Make +3</button>
+            <button class="miss" data-action="miss" data-type="fg3">Miss</button>
+          </div>
+        </div>
+
+        <div class="stat-box simple">
+          <div class="stat-label">Rebounds</div>
+          <div class="stat-value" id="reb">0</div>
+          <div class="stat-buttons">
+            <button data-action="inc" data-stat="reb">+1</button>
+            <button class="secondary" data-action="dec" data-stat="reb">−1</button>
+          </div>
+        </div>
+
+        <div class="stat-box simple">
+          <div class="stat-label">Assists</div>
+          <div class="stat-value" id="ast">0</div>
+          <div class="stat-buttons">
+            <button data-action="inc" data-stat="ast">+1</button>
+            <button class="secondary" data-action="dec" data-stat="ast">−1</button>
+          </div>
+        </div>
+
+        <div class="stat-box simple">
+          <div class="stat-label">Steals</div>
+          <div class="stat-value" id="stl">0</div>
+          <div class="stat-buttons">
+            <button data-action="inc" data-stat="stl">+1</button>
+            <button class="secondary" data-action="dec" data-stat="stl">−1</button>
+          </div>
+        </div>
+
+        <div class="stat-box simple">
+          <div class="stat-label">Blocks</div>
+          <div class="stat-value" id="blk">0</div>
+          <div class="stat-buttons">
+            <button data-action="inc" data-stat="blk">+1</button>
+            <button class="secondary" data-action="dec" data-stat="blk">−1</button>
+          </div>
+        </div>
+
+        <div class="stat-box simple">
+          <div class="stat-label">Turnovers</div>
+          <div class="stat-value" id="tov">0</div>
+          <div class="stat-buttons">
+            <button data-action="inc" data-stat="tov">+1</button>
+            <button class="secondary" data-action="dec" data-stat="tov">−1</button>
+          </div>
+        </div>
+
+        <div class="stat-box simple">
+          <div class="stat-label">Fouls</div>
+          <div class="stat-value" id="pf">0</div>
+          <div class="stat-buttons">
+            <button data-action="inc" data-stat="pf">+1</button>
+            <button class="secondary" data-action="dec" data-stat="pf">−1</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-actions">
+        <button id="finishGame" class="primary">Finish Game</button>
+        <button id="cancelGame" class="danger">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Career Averages</h2>
+      <span class="muted" id="gamesPlayed">0 games</span>
+    </div>
+    <div class="avg-grid" id="averages"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2>Game History</h2>
+      <button id="exportBtn" class="secondary">Export JSON</button>
+    </div>
+    <div id="history"></div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
