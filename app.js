@@ -62,6 +62,9 @@ function renderLiveGame() {
   const newForm = document.getElementById('newGameForm');
   const live = document.getElementById('liveGame');
   const status = document.getElementById('gameStatus');
+  const finishBtn = document.getElementById('finishGame');
+  const cancelBtn = document.getElementById('cancelGame');
+  const banner = document.getElementById('editBanner');
 
   if (!liveGame) {
     newForm.classList.remove('hidden');
@@ -76,10 +79,15 @@ function renderLiveGame() {
 
   newForm.classList.add('hidden');
   live.classList.remove('hidden');
-  status.textContent = 'Game in progress';
 
-  document.getElementById('liveOpponent').textContent = liveGame.opponent || 'Game';
-  document.getElementById('liveDate').textContent = formatDate(liveGame.date);
+  const editing = !!liveGame.editingId;
+  status.textContent = editing ? 'Editing saved game' : 'Game in progress';
+  finishBtn.textContent = editing ? 'Save Changes' : 'Finish Game';
+  cancelBtn.textContent = editing ? 'Discard Changes' : 'Cancel';
+  banner.classList.toggle('hidden', !editing);
+
+  document.getElementById('liveOpponent').value = liveGame.opponent || '';
+  document.getElementById('liveDate').value = liveGame.date || '';
 
   const s = liveGame.stats;
   document.getElementById('livePoints').textContent = pointsOf(s);
@@ -148,11 +156,17 @@ function renderHistory() {
           <span class="date">${formatDate(g.date)}</span>
         </div>
         <div class="stats">${line}</div>
-        <button class="delete-btn" data-id="${g.id}">Delete</button>
+        <div class="history-actions">
+          <button class="edit-btn" data-id="${g.id}">Edit</button>
+          <button class="delete-btn" data-id="${g.id}">Delete</button>
+        </div>
       </div>
     `;
   }).join('');
 
+  container.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => editGame(btn.dataset.id));
+  });
   container.querySelectorAll('.delete-btn').forEach(btn => {
     btn.addEventListener('click', () => deleteGame(btn.dataset.id));
   });
@@ -186,9 +200,32 @@ function startGame() {
   renderLiveGame();
 }
 
+function syncMetaFromInputs() {
+  if (!liveGame) return;
+  const opp = document.getElementById('liveOpponent').value.trim();
+  const date = document.getElementById('liveDate').value;
+  liveGame.opponent = opp || 'Game';
+  if (date) liveGame.date = date;
+}
+
 function finishGame() {
   if (!liveGame) return;
-  state.games.push(liveGame);
+  syncMetaFromInputs();
+
+  if (liveGame.editingId) {
+    const idx = state.games.findIndex(g => g.id === liveGame.editingId);
+    if (idx !== -1) {
+      state.games[idx] = {
+        id: liveGame.editingId,
+        opponent: liveGame.opponent,
+        date: liveGame.date,
+        stats: liveGame.stats,
+      };
+    }
+  } else {
+    state.games.push(liveGame);
+  }
+
   liveGame = null;
   saveState();
   saveLive();
@@ -197,15 +234,44 @@ function finishGame() {
 
 function cancelGame() {
   if (!liveGame) return;
-  if (!confirm('Cancel this game? All stats will be lost.')) return;
+  const editing = !!liveGame.editingId;
+  const msg = editing
+    ? 'Discard changes to this game?'
+    : 'Cancel this game? All stats will be lost.';
+  if (!confirm(msg)) return;
   liveGame = null;
   saveLive();
   render();
 }
 
+function editGame(id) {
+  if (liveGame && !liveGame.editingId) {
+    alert('Finish or cancel your current game before editing another.');
+    return;
+  }
+  const game = state.games.find(g => g.id === id);
+  if (!game) return;
+
+  liveGame = {
+    id: game.id,
+    editingId: game.id,
+    opponent: game.opponent,
+    date: game.date,
+    stats: { ...emptyStats(), ...game.stats },
+  };
+  saveLive();
+  render();
+  document.getElementById('liveGameCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function deleteGame(id) {
   if (!confirm('Delete this game?')) return;
   state.games = state.games.filter(g => g.id !== id);
+  // If currently editing this game, drop the edit session too
+  if (liveGame && liveGame.editingId === id) {
+    liveGame = null;
+    saveLive();
+  }
   saveState();
   render();
 }
@@ -255,6 +321,21 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('finishGame').addEventListener('click', finishGame);
   document.getElementById('cancelGame').addEventListener('click', cancelGame);
   document.getElementById('exportBtn').addEventListener('click', exportJson);
+
+  // Persist opponent/date edits while editing or playing live
+  document.getElementById('liveOpponent').addEventListener('input', () => {
+    if (!liveGame) return;
+    liveGame.opponent = document.getElementById('liveOpponent').value;
+    saveLive();
+  });
+  document.getElementById('liveDate').addEventListener('change', () => {
+    if (!liveGame) return;
+    const v = document.getElementById('liveDate').value;
+    if (v) {
+      liveGame.date = v;
+      saveLive();
+    }
+  });
 
   // Delegate stat button clicks
   document.getElementById('liveGame').addEventListener('click', (e) => {

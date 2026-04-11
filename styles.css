@@ -147,6 +147,34 @@ button.primary:hover { background: #27ae60; }
   color: var(--accent);
 }
 
+.game-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+  max-width: 60%;
+}
+
+.game-meta input[type="text"] {
+  flex: 2 1 140px;
+}
+
+.game-meta input[type="date"] {
+  flex: 1 1 130px;
+}
+
+.edit-banner {
+  margin-top: 12px;
+  background: rgba(255, 122, 26, 0.12);
+  border: 1px solid rgba(255, 122, 26, 0.4);
+  color: var(--accent);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+}
+
 .muted { color: var(--muted); margin-left: 8px; font-size: 13px; }
 
 .stat-grid {
@@ -266,11 +294,24 @@ button.miss:hover { background: var(--border); }
   color: var(--text);
 }
 
-.delete-btn {
+.history-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.edit-btn, .delete-btn {
   background: transparent;
-  color: var(--red);
   padding: 4px 8px;
   font-size: 12px;
+}
+
+.edit-btn {
+  color: var(--accent);
+}
+.edit-btn:hover { background: rgba(255, 122, 26, 0.12); }
+
+.delete-btn {
+  color: var(--red);
 }
 .delete-btn:hover { background: rgba(231, 76, 60, 0.1); }
 

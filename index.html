@@ -33,9 +33,9 @@
 
     <div id="liveGame" class="hidden">
       <div class="game-header">
-        <div>
-          <strong id="liveOpponent"></strong>
-          <span id="liveDate" class="muted"></span>
+        <div class="game-meta">
+          <input type="text" id="liveOpponent" placeholder="Opponent" />
+          <input type="date" id="liveDate" />
         </div>
         <div class="big-score"><span id="livePoints">0</span> PTS</div>
       </div>
@@ -127,6 +127,7 @@
         <button id="finishGame" class="primary">Finish Game</button>
         <button id="cancelGame" class="danger">Cancel</button>
       </div>
+      <div id="editBanner" class="edit-banner hidden">Editing saved game</div>
     </div>
   </section>
 
