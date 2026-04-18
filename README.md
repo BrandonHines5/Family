@@ -20,3 +20,14 @@ Just open `index.html` in any browser — no build step, no server.
 - `index.html` — markup
 - `styles.css` — styles
 - `app.js` — all logic
+
+## Workout Tracker
+
+A companion app for logging daily workouts on a calendar. Open `workout.html` in any browser.
+
+- Monthly calendar view with today highlighted
+- Click any past or current day to toggle "worked out"
+- Report of workouts over the past week, month, and 3 months
+- Data persists in `localStorage`
+
+Files: `workout.html`, `workout.css`, `workout.js`.

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Workout Tracker</title>
+<link rel="stylesheet" href="workout.css" />
+</head>
+<body>
+<header>
+  <h1>💪 Workout Tracker</h1>
+  <p class="subtitle">Tap any day to log a workout.</p>
+</header>
+
+<main>
+  <section class="card" id="reportCard">
+    <div class="card-header">
+      <h2>Report</h2>
+      <span class="muted" id="totalCount">0 total workouts</span>
+    </div>
+    <div class="report-grid">
+      <div class="report-box">
+        <div class="report-label">Past Week</div>
+        <div class="report-value" id="reportWeek">0</div>
+        <div class="report-sub">of 7 days</div>
+      </div>
+      <div class="report-box">
+        <div class="report-label">Past Month</div>
+        <div class="report-value" id="reportMonth">0</div>
+        <div class="report-sub">of 30 days</div>
+      </div>
+      <div class="report-box">
+        <div class="report-label">Past 3 Months</div>
+        <div class="report-value" id="reportQuarter">0</div>
+        <div class="report-sub">of 90 days</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <div class="calendar-nav">
+        <button id="prevMonth" class="nav-btn" aria-label="Previous month">‹</button>
+        <h2 id="monthLabel">Month Year</h2>
+        <button id="nextMonth" class="nav-btn" aria-label="Next month">›</button>
+      </div>
+      <button id="todayBtn" class="secondary">Today</button>
+    </div>
+
+    <div class="weekday-row">
+      <div>Sun</div>
+      <div>Mon</div>
+      <div>Tue</div>
+      <div>Wed</div>
+      <div>Thu</div>
+      <div>Fri</div>
+      <div>Sat</div>
+    </div>
+    <div class="calendar-grid" id="calendar"></div>
+
+    <div class="legend">
+      <span class="legend-item"><span class="swatch today"></span> Today</span>
+      <span class="legend-item"><span class="swatch worked"></span> Worked out</span>
+      <span class="legend-item"><span class="swatch future"></span> Future</span>
+    </div>
+  </section>
+</main>
+
+<script src="workout.js"></script>
+</body>
+</html>
