@@ -18,10 +18,15 @@ const SUPABASE_CONFIGURED =
   !cfg.SUPABASE_ANON_KEY.includes("YOUR-ANON-KEY");
 
 let supabase = null;
-if (SUPABASE_CONFIGURED && window.supabase?.createClient) {
-  supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-    auth: { persistSession: false },
-  });
+try {
+  if (SUPABASE_CONFIGURED && window.supabase?.createClient) {
+    supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false },
+    });
+  }
+} catch (err) {
+  console.error("Supabase init failed:", err);
+  supabase = null;
 }
 
 let state = { events: [] };
@@ -369,6 +374,9 @@ function addFlightRow(flight) {
 function escapeAttr(s) { return String(s).replace(/"/g, "&quot;"); }
 
 function openEventModal({ event, defaultDate } = {}) {
+  if (membersContainer.children.length === 0) {
+    buildMemberToggles(membersContainer, "event-member");
+  }
   form.reset();
   flightsList.innerHTML = "";
   deleteBtn.hidden = !event;
