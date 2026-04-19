@@ -332,8 +332,9 @@ async function initData() {
     if (local) state = local;
     setSyncStatus(
       SUPABASE_CONFIGURED ? "error" : "local",
-      SUPABASE_CONFIGURED ? "Offline — using local copy" : "Local only — share setup incomplete"
+      SUPABASE_CONFIGURED ? "Offline — client library blocked" : "Local only — share setup incomplete"
     );
+    if (SUPABASE_CONFIGURED) showDebug("Supabase client library (supabase-js) didn't load. CDN may be blocked.");
     return;
   }
 
@@ -361,6 +362,8 @@ async function initData() {
     try { subscribeRealtime(); } catch (e) { console.warn("Realtime subscribe failed:", e); }
   } catch (err) {
     console.error("Initial fetch failed:", err);
+    const msg = (err && (err.message || err.hint || err.code)) || String(err);
+    showDebug("Supabase query failed: " + msg);
     const local = loadLocal();
     if (local) state = local;
     setSyncStatus("error", "Offline — using local copy");
@@ -410,6 +413,18 @@ function setSyncStatus(kind, text) {
   if (!el) return;
   el.textContent = text;
   el.dataset.kind = kind;
+}
+
+function showDebug(msg) {
+  let el = document.getElementById("debug-banner");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "debug-banner";
+    el.style.cssText = "background:#fff3cd;border:1px solid #f5c76a;color:#7d5a00;padding:8px 12px;margin:8px 16px;border-radius:6px;font-size:12px;font-family:monospace;white-space:pre-wrap;word-break:break-word;";
+    const main = document.querySelector("main");
+    if (main) main.insertBefore(el, main.firstChild);
+  }
+  el.textContent = "Debug: " + msg;
 }
 
 function activeTab() {
