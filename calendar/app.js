@@ -411,9 +411,13 @@ function openEventModal({ event, defaultDate } = {}) {
   }
   vacationFields.hidden = typeSelect.value !== "vacation";
   modal.hidden = false;
+  modal.style.display = "";
 }
 
-function closeModal() { modal.hidden = true; }
+function closeModal() {
+  modal.hidden = true;
+  modal.style.display = "none";
+}
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
