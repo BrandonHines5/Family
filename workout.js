@@ -1,5 +1,6 @@
 (() => {
   const STORAGE_KEY = "workoutTracker.days";
+  const GOAL_PER_WEEK = 4;
 
   // State: a Set of "YYYY-MM-DD" strings for days worked out.
   let workoutDays = loadWorkouts();
@@ -13,6 +14,9 @@
   const reportWeek = document.getElementById("reportWeek");
   const reportMonth = document.getElementById("reportMonth");
   const reportQuarter = document.getElementById("reportQuarter");
+  const statusWeek = document.getElementById("statusWeek");
+  const statusMonth = document.getElementById("statusMonth");
+  const statusQuarter = document.getElementById("statusQuarter");
   const totalCount = document.getElementById("totalCount");
 
   prevBtn.addEventListener("click", () => {
@@ -75,11 +79,27 @@
   }
 
   function renderReport() {
-    reportWeek.textContent = countWorkoutsInLastNDays(7);
-    reportMonth.textContent = countWorkoutsInLastNDays(30);
-    reportQuarter.textContent = countWorkoutsInLastNDays(90);
+    const week = countWorkoutsInLastNDays(7);
+    const month = countWorkoutsInLastNDays(30);
+    const quarter = countWorkoutsInLastNDays(90);
+    reportWeek.textContent = week;
+    reportMonth.textContent = month;
+    reportQuarter.textContent = quarter;
+    renderStatus(statusWeek, week, 7);
+    renderStatus(statusMonth, month, 30);
+    renderStatus(statusQuarter, quarter, 90);
     const total = workoutDays.size;
     totalCount.textContent = `${total} total workout${total === 1 ? "" : "s"}`;
+  }
+
+  function renderStatus(el, count, days) {
+    const target = Math.round((GOAL_PER_WEEK * days) / 7);
+    const onTrack = count >= target;
+    el.classList.toggle("on-track", onTrack);
+    el.classList.toggle("behind", !onTrack);
+    el.textContent = onTrack
+      ? `✓ On track (goal ${target})`
+      : `✗ Behind (goal ${target})`;
   }
 
   function renderCalendar() {
