@@ -8,7 +8,10 @@
 </head>
 <body>
 <header class="app-header">
-  <h1>Hines Family Calendar</h1>
+  <div class="header-row">
+    <h1>Hines Family Calendar</h1>
+    <span id="sync-status" class="sync-status" data-kind="connecting">Loading…</span>
+  </div>
   <nav class="tabs">
     <button class="tab-btn active" data-tab="calendar">Calendar</button>
     <button class="tab-btn" data-tab="vacations">Vacations</button>
@@ -176,6 +179,8 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
-// Hines Family Calendar — standalone static app
-// State persists in localStorage under STORAGE_KEY.
+// Hines Family Calendar
+// Uses Supabase for shared state (with realtime sync across phones).
+// Falls back to localStorage if Supabase config isn't provided.
 
 const STORAGE_KEY = "hines-family-calendar-v1";
 const MEMBERS = ["Brandon", "Kelly", "Montgomery", "Justice", "Valor"];
@@ -8,22 +9,23 @@ const MONTH_NAMES = [
   "July","August","September","October","November","December"
 ];
 
-// ---------- State ----------
-let state = load() || { events: [] };
-let viewDate = new Date(); // the month currently displayed
+// ---------- Backend (Supabase or local) ----------
+const cfg = window.FAMILY_CAL_CONFIG || {};
+const SUPABASE_CONFIGURED =
+  cfg.SUPABASE_URL &&
+  cfg.SUPABASE_ANON_KEY &&
+  !cfg.SUPABASE_URL.includes("YOUR-PROJECT-REF") &&
+  !cfg.SUPABASE_ANON_KEY.includes("YOUR-ANON-KEY");
 
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+let supabase = null;
+if (SUPABASE_CONFIGURED && window.supabase?.createClient) {
+  supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: { persistSession: false },
+  });
 }
-function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-function uid() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
+
+let state = { events: [] };
+let viewDate = new Date();
 
 // ---------- Date helpers ----------
 function toISO(d) {
@@ -57,6 +59,131 @@ function formatShort(iso) {
   const d = fromISO(iso);
   return `${MONTH_NAMES[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}`;
 }
+function uid() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+// ---------- Serialization (db row <-> event) ----------
+function rowToEvent(r) {
+  return {
+    id: r.id,
+    title: r.title,
+    type: r.type,
+    status: r.status,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    members: r.members || [],
+    notes: r.notes || "",
+    vacation: r.vacation || undefined,
+  };
+}
+function eventToRow(ev) {
+  return {
+    id: ev.id,
+    title: ev.title,
+    type: ev.type,
+    status: ev.status,
+    start_date: ev.startDate,
+    end_date: ev.endDate,
+    members: ev.members,
+    notes: ev.notes || "",
+    vacation: ev.vacation || null,
+  };
+}
+
+// ---------- Data layer ----------
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function saveLocal() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+async function initData() {
+  if (supabase) {
+    setSyncStatus("connecting", "Connecting…");
+    const { data, error } = await supabase.from("events").select("*");
+    if (error) {
+      console.error(error);
+      setSyncStatus("error", "Offline (read error)");
+      const local = loadLocal();
+      if (local) state = local;
+      return;
+    }
+    state.events = data.map(rowToEvent);
+    setSyncStatus("ok", "Synced");
+
+    // One-time migration: if the cloud is empty and local has data, push it up.
+    const local = loadLocal();
+    if (state.events.length === 0 && local && local.events && local.events.length) {
+      setSyncStatus("connecting", "Uploading local events…");
+      const rows = local.events.map(eventToRow);
+      const { error: upErr } = await supabase.from("events").upsert(rows);
+      if (!upErr) {
+        state.events = local.events;
+        setSyncStatus("ok", "Synced (migrated local)");
+      }
+    }
+
+    subscribeRealtime();
+  } else {
+    const local = loadLocal();
+    if (local) state = local;
+    setSyncStatus("local", "Local only — share setup incomplete");
+  }
+}
+
+async function upsertEvent(ev) {
+  if (supabase) {
+    const { error } = await supabase.from("events").upsert(eventToRow(ev));
+    if (error) { console.error(error); alert("Save failed: " + error.message); return false; }
+  } else {
+    saveLocal();
+  }
+  return true;
+}
+
+async function deleteEvent(id) {
+  if (supabase) {
+    const { error } = await supabase.from("events").delete().eq("id", id);
+    if (error) { console.error(error); alert("Delete failed: " + error.message); return false; }
+  } else {
+    saveLocal();
+  }
+  return true;
+}
+
+function subscribeRealtime() {
+  supabase
+    .channel("events-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "events" }, (payload) => {
+      if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+        const ev = rowToEvent(payload.new);
+        const idx = state.events.findIndex(e => e.id === ev.id);
+        if (idx >= 0) state.events[idx] = ev;
+        else state.events.push(ev);
+      } else if (payload.eventType === "DELETE") {
+        state.events = state.events.filter(e => e.id !== payload.old.id);
+      }
+      renderCalendar();
+      if (activeTab() === "vacations") renderVacations();
+    })
+    .subscribe();
+}
+
+function setSyncStatus(kind, text) {
+  const el = document.getElementById("sync-status");
+  if (!el) return;
+  el.textContent = text;
+  el.dataset.kind = kind;
+}
+
+function activeTab() {
+  return document.querySelector(".tab-btn.active")?.dataset.tab;
+}
 
 // ---------- Event helpers ----------
 function eventCoversDate(ev, isoDate) {
@@ -66,7 +193,7 @@ function eventsOnDate(isoDate) {
   return state.events.filter(ev => eventCoversDate(ev, isoDate));
 }
 
-// ---------- Rendering: tabs ----------
+// ---------- Tabs ----------
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -88,7 +215,7 @@ function renderCalendar() {
   monthLabel.textContent = `${MONTH_NAMES[month]} ${year}`;
 
   const firstOfMonth = new Date(year, month, 1);
-  const startDay = firstOfMonth.getDay(); // Sunday=0
+  const startDay = firstOfMonth.getDay();
   const gridStart = addDays(firstOfMonth, -startDay);
 
   const activeMembers = getFilterMembers();
@@ -119,9 +246,7 @@ function renderCalendar() {
     dayEvents.sort((a, b) => (a.type === "vacation" ? -1 : 1));
 
     const MAX = 4;
-    dayEvents.slice(0, MAX).forEach(ev => {
-      cell.appendChild(renderEventPill(ev));
-    });
+    dayEvents.slice(0, MAX).forEach(ev => cell.appendChild(renderEventPill(ev)));
     if (dayEvents.length > MAX) {
       const more = document.createElement("div");
       more.className = "more-indicator";
@@ -169,7 +294,6 @@ function getFilterMembers() {
   return Array.from(document.querySelectorAll(".filter-member:checked")).map(el => el.value);
 }
 
-// Nav controls
 document.getElementById("prev-month").addEventListener("click", () => {
   viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
   renderCalendar();
@@ -218,11 +342,9 @@ everyoneToggle.addEventListener("change", () => {
     cb.checked = everyoneToggle.checked;
   });
 });
-document.querySelectorAll('[name="event-member"]').forEach(cb => {
-  cb.addEventListener("change", () => {
-    const all = Array.from(document.querySelectorAll('[name="event-member"]'));
-    everyoneToggle.checked = all.every(x => x.checked);
-  });
+membersContainer.addEventListener("change", () => {
+  const all = Array.from(document.querySelectorAll('[name="event-member"]'));
+  everyoneToggle.checked = all.every(x => x.checked);
 });
 
 document.getElementById("event-close").addEventListener("click", closeModal);
@@ -231,9 +353,7 @@ modal.addEventListener("click", (e) => {
   if (e.target === modal) closeModal();
 });
 
-document.getElementById("add-flight").addEventListener("click", () => {
-  addFlightRow({});
-});
+document.getElementById("add-flight").addEventListener("click", () => addFlightRow({}));
 
 function addFlightRow(flight) {
   const row = document.createElement("div");
@@ -246,9 +366,7 @@ function addFlightRow(flight) {
   flightsList.appendChild(row);
 }
 
-function escapeAttr(s) {
-  return String(s).replace(/"/g, "&quot;");
-}
+function escapeAttr(s) { return String(s).replace(/"/g, "&quot;"); }
 
 function openEventModal({ event, defaultDate } = {}) {
   form.reset();
@@ -287,11 +405,9 @@ function openEventModal({ event, defaultDate } = {}) {
   modal.hidden = false;
 }
 
-function closeModal() {
-  modal.hidden = true;
-}
+function closeModal() { modal.hidden = true; }
 
-form.addEventListener("submit", (e) => {
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const id = document.getElementById("event-id").value || uid();
   const members = Array.from(document.querySelectorAll('[name="event-member"]:checked')).map(cb => cb.value);
@@ -328,21 +444,27 @@ form.addEventListener("submit", (e) => {
       sableCare: document.getElementById("v-sable").value.trim(),
     };
   }
+
+  // Optimistic local update
   const idx = state.events.findIndex(e => e.id === id);
   if (idx >= 0) state.events[idx] = ev;
   else state.events.push(ev);
-  save();
+
+  const ok = await upsertEvent(ev);
+  if (!ok && !supabase) saveLocal();
+  if (!supabase) saveLocal();
   closeModal();
   renderCalendar();
-  if (document.querySelector(".tab-btn.active").dataset.tab === "vacations") renderVacations();
+  if (activeTab() === "vacations") renderVacations();
 });
 
-deleteBtn.addEventListener("click", () => {
+deleteBtn.addEventListener("click", async () => {
   const id = document.getElementById("event-id").value;
   if (!id) return;
   if (!confirm("Delete this event?")) return;
   state.events = state.events.filter(e => e.id !== id);
-  save();
+  await deleteEvent(id);
+  if (!supabase) saveLocal();
   closeModal();
   renderCalendar();
   renderVacations();
@@ -372,9 +494,7 @@ function renderVacations() {
 function renderVacationCard(v) {
   const card = document.createElement("div");
   card.className = "vacation-card " + v.status;
-  const travelers = v.members.map(m =>
-    `<span class="chip c-${m.toLowerCase()}">${m}</span>`
-  ).join("");
+  const travelers = v.members.map(m => `<span class="chip c-${m.toLowerCase()}">${m}</span>`).join("");
   const notGoing = MEMBERS.filter(m => !v.members.includes(m));
   const vac = v.vacation || {};
 
@@ -403,9 +523,7 @@ function renderVacationCard(v) {
     <div class="travelers">${travelers || '<span class="muted">No travelers selected</span>'}</div>
     ${detailRows.join("")}
   `;
-  card.querySelector(".edit-link").addEventListener("click", () => {
-    openEventModal({ event: v });
-  });
+  card.querySelector(".edit-link").addEventListener("click", () => openEventModal({ event: v }));
   return card;
 }
 
@@ -453,7 +571,7 @@ document.getElementById("suggest-run").addEventListener("click", () => {
 
   const suggestions = findAvailableWindows({ members, duration, start, end, avoidProspective });
   if (!suggestions.length) {
-    resultsEl.innerHTML = `<div class="empty">No ${duration}-day windows are fully free. Try extending the date range, shortening the trip, or enabling "avoid prospective" off.</div>`;
+    resultsEl.innerHTML = `<div class="empty">No ${duration}-day windows are fully free. Try extending the date range, shortening the trip, or turning off "avoid prospective".</div>`;
     return;
   }
   resultsEl.innerHTML = "";
@@ -503,33 +621,22 @@ function findAvailableWindows({ members, duration, start, end, avoidProspective 
 
     for (const ev of state.events) {
       if (!ev.members.some(m => members.includes(m))) continue;
-      // overlap check
       if (ev.endDate < windowStart || ev.startDate > windowEnd) continue;
-      if (ev.status === "confirmed") {
-        hasConfirmedConflict = true;
-        break;
-      }
+      if (ev.status === "confirmed") { hasConfirmedConflict = true; break; }
       if (ev.status === "prospective") prospectiveConflicts++;
     }
 
     if (!hasConfirmedConflict && (!avoidProspective || prospectiveConflicts === 0)) {
-      // count weekend days (Saturday=6, Sunday=0) included
       let weekendDays = 0;
       for (let i = 0; i < duration; i++) {
         const day = addDays(cursor, i).getDay();
         if (day === 0 || day === 6) weekendDays++;
       }
-      results.push({
-        startDate: windowStart,
-        endDate: windowEnd,
-        prospectiveConflicts,
-        weekendDays,
-      });
+      results.push({ startDate: windowStart, endDate: windowEnd, prospectiveConflicts, weekendDays });
     }
     cursor = addDays(cursor, 1);
   }
 
-  // rank: fewer prospective conflicts first, then more weekend days, then earlier
   results.sort((a, b) =>
     a.prospectiveConflicts - b.prospectiveConflicts
     || b.weekendDays - a.weekendDays
@@ -538,5 +645,8 @@ function findAvailableWindows({ members, duration, start, end, avoidProspective 
   return results;
 }
 
-// ---------- Initial render ----------
-renderCalendar();
+// ---------- Boot ----------
+(async function boot() {
+  await initData();
+  renderCalendar();
+})();
