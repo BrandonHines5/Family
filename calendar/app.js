@@ -18,15 +18,39 @@ const SUPABASE_CONFIGURED =
   !cfg.SUPABASE_ANON_KEY.includes("YOUR-ANON-KEY");
 
 let supabase = null;
-try {
-  if (SUPABASE_CONFIGURED && window.supabase?.createClient) {
-    supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+
+async function waitForSupabaseLib(timeoutMs = 4000) {
+  if (window.supabase?.createClient) return true;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await new Promise(r => setTimeout(r, 150));
+    if (window.supabase?.createClient) return true;
+  }
+  return false;
+}
+
+async function initSupabaseClient() {
+  if (!SUPABASE_CONFIGURED) return null;
+  const ready = await waitForSupabaseLib();
+  if (!ready) {
+    console.warn("Supabase client library didn't load; falling back to local mode.");
+    return null;
+  }
+  try {
+    return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
       auth: { persistSession: false },
     });
+  } catch (err) {
+    console.error("Supabase init failed:", err);
+    return null;
   }
-} catch (err) {
-  console.error("Supabase init failed:", err);
-  supabase = null;
+}
+
+function withTimeout(promise, ms, tag) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${tag} timed out after ${ms}ms`)), ms)),
+  ]);
 }
 
 let state = { events: [] };
@@ -108,20 +132,29 @@ function saveLocal() {
 }
 
 async function initData() {
-  if (supabase) {
-    setSyncStatus("connecting", "Connecting…");
-    const { data, error } = await supabase.from("events").select("*");
-    if (error) {
-      console.error(error);
-      setSyncStatus("error", "Offline (read error)");
-      const local = loadLocal();
-      if (local) state = local;
-      return;
-    }
+  setSyncStatus("connecting", "Connecting…");
+  supabase = await initSupabaseClient();
+
+  if (!supabase) {
+    const local = loadLocal();
+    if (local) state = local;
+    setSyncStatus(
+      SUPABASE_CONFIGURED ? "error" : "local",
+      SUPABASE_CONFIGURED ? "Offline — using local copy" : "Local only — share setup incomplete"
+    );
+    return;
+  }
+
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from("events").select("*"),
+      8000,
+      "events select"
+    );
+    if (error) throw error;
     state.events = data.map(rowToEvent);
     setSyncStatus("ok", "Synced");
 
-    // One-time migration: if the cloud is empty and local has data, push it up.
     const local = loadLocal();
     if (state.events.length === 0 && local && local.events && local.events.length) {
       setSyncStatus("connecting", "Uploading local events…");
@@ -133,11 +166,12 @@ async function initData() {
       }
     }
 
-    subscribeRealtime();
-  } else {
+    try { subscribeRealtime(); } catch (e) { console.warn("Realtime subscribe failed:", e); }
+  } catch (err) {
+    console.error("Initial fetch failed:", err);
     const local = loadLocal();
     if (local) state = local;
-    setSyncStatus("local", "Local only — share setup incomplete");
+    setSyncStatus("error", "Offline — using local copy");
   }
 }
 
@@ -659,6 +693,9 @@ function findAvailableWindows({ members, duration, start, end, avoidProspective 
 
 // ---------- Boot ----------
 (async function boot() {
+  // Render the calendar shell immediately so the UI is never blank while
+  // we connect to Supabase.
+  renderCalendar();
   await initData();
   renderCalendar();
 })();
