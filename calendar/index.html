@@ -189,8 +189,6 @@
     if (el) { el.textContent = "Starting…"; el.dataset.kind = "connecting"; }
   })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
-<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" async></script>
 <script>
 // ---------- Supabase config (inline so there's no separate file to cache) ----------
 window.FAMILY_CAL_CONFIG = {
@@ -213,33 +211,33 @@ const SUPABASE_CONFIGURED =
   !cfg.SUPABASE_URL.includes("YOUR-PROJECT-REF") &&
   !cfg.SUPABASE_ANON_KEY.includes("YOUR-ANON-KEY");
 
-let supabase = null;
+// Direct REST access to Supabase via fetch() — no client library required.
+// PostgREST endpoint: {URL}/rest/v1/{table}
 
-async function waitForSupabaseLib(timeoutMs = 12000) {
-  if (window.supabase && window.supabase.createClient) return true;
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    await new Promise(r => setTimeout(r, 150));
-    if (window.supabase && window.supabase.createClient) return true;
-  }
-  return false;
-}
+let supabase = null; // stays null unless the optional realtime lib loaded
 
-async function initSupabaseClient() {
-  if (!SUPABASE_CONFIGURED) return null;
-  const ready = await waitForSupabaseLib();
-  if (!ready) {
-    console.warn("Supabase client library didn't load; falling back to local mode.");
-    return null;
+const REST_HEADERS = SUPABASE_CONFIGURED ? {
+  "apikey": cfg.SUPABASE_ANON_KEY,
+  "Authorization": "Bearer " + cfg.SUPABASE_ANON_KEY,
+  "Content-Type": "application/json",
+} : {};
+
+async function restRequest(method, path, body, extraHeaders) {
+  const url = cfg.SUPABASE_URL + "/rest/v1" + path;
+  const headers = Object.assign({}, REST_HEADERS, extraHeaders || {});
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    let text = "";
+    try { text = await res.text(); } catch {}
+    throw new Error("HTTP " + res.status + " " + res.statusText + (text ? " — " + text : ""));
   }
-  try {
-    return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-      auth: { persistSession: false },
-    });
-  } catch (err) {
-    console.error("Supabase init failed:", err);
-    return null;
-  }
+  if (res.status === 204) return null;
+  const ct = res.headers.get("content-type") || "";
+  return ct.includes("application/json") ? res.json() : null;
 }
 
 function withTimeout(promise, ms, tag) {
@@ -325,88 +323,86 @@ function saveLocal() {
 }
 
 async function initData() {
-  setSyncStatus("connecting", "Connecting…");
-  supabase = await initSupabaseClient();
-
-  if (!supabase) {
+  if (!SUPABASE_CONFIGURED) {
     const local = loadLocal();
     if (local) state = local;
-    setSyncStatus(
-      SUPABASE_CONFIGURED ? "error" : "local",
-      SUPABASE_CONFIGURED ? "Offline — client library blocked" : "Local only — share setup incomplete"
-    );
-    if (SUPABASE_CONFIGURED) showDebug("Supabase client library (supabase-js) didn't load. CDN may be blocked.");
+    setSyncStatus("local", "Local only — share setup incomplete");
     return;
   }
 
+  setSyncStatus("connecting", "Connecting…");
+
   try {
-    const { data, error } = await withTimeout(
-      supabase.from("events").select("*"),
-      8000,
+    const rows = await withTimeout(
+      restRequest("GET", "/events?select=*", null, { "Accept": "application/json" }),
+      10000,
       "events select"
     );
-    if (error) throw error;
-    state.events = data.map(rowToEvent);
+    state.events = (rows || []).map(rowToEvent);
     setSyncStatus("ok", "Synced");
 
     const local = loadLocal();
     if (state.events.length === 0 && local && local.events && local.events.length) {
       setSyncStatus("connecting", "Uploading local events…");
-      const rows = local.events.map(eventToRow);
-      const { error: upErr } = await supabase.from("events").upsert(rows);
-      if (!upErr) {
+      try {
+        const bulk = local.events.map(eventToRow);
+        await restRequest("POST", "/events", bulk, { "Prefer": "resolution=merge-duplicates" });
         state.events = local.events;
         setSyncStatus("ok", "Synced (migrated local)");
+      } catch (e) {
+        console.warn("Migration upload failed:", e);
       }
     }
 
-    try { subscribeRealtime(); } catch (e) { console.warn("Realtime subscribe failed:", e); }
+    // Simple polling to pick up edits from other family members every 20s.
+    startPolling();
   } catch (err) {
     console.error("Initial fetch failed:", err);
-    const msg = (err && (err.message || err.hint || err.code)) || String(err);
-    showDebug("Supabase query failed: " + msg);
+    const msg = (err && err.message) || String(err);
+    showDebug("Supabase REST fetch failed: " + msg);
     const local = loadLocal();
     if (local) state = local;
     setSyncStatus("error", "Offline — using local copy");
   }
 }
 
+let pollTimer = null;
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const rows = await restRequest("GET", "/events?select=*", null, { "Accept": "application/json" });
+      state.events = (rows || []).map(rowToEvent);
+      renderCalendar();
+      if (activeTab() === "vacations") renderVacations();
+    } catch (e) {
+      console.warn("Poll failed:", e);
+    }
+  }, 20000);
+}
+
 async function upsertEvent(ev) {
-  if (supabase) {
-    const { error } = await supabase.from("events").upsert(eventToRow(ev));
-    if (error) { console.error(error); alert("Save failed: " + error.message); return false; }
-  } else {
-    saveLocal();
+  if (!SUPABASE_CONFIGURED) { saveLocal(); return true; }
+  try {
+    await restRequest("POST", "/events", [eventToRow(ev)], { "Prefer": "resolution=merge-duplicates" });
+    return true;
+  } catch (err) {
+    console.error(err);
+    alert("Save failed: " + (err.message || err));
+    return false;
   }
-  return true;
 }
 
 async function deleteEvent(id) {
-  if (supabase) {
-    const { error } = await supabase.from("events").delete().eq("id", id);
-    if (error) { console.error(error); alert("Delete failed: " + error.message); return false; }
-  } else {
-    saveLocal();
+  if (!SUPABASE_CONFIGURED) { saveLocal(); return true; }
+  try {
+    await restRequest("DELETE", "/events?id=eq." + encodeURIComponent(id));
+    return true;
+  } catch (err) {
+    console.error(err);
+    alert("Delete failed: " + (err.message || err));
+    return false;
   }
-  return true;
-}
-
-function subscribeRealtime() {
-  supabase
-    .channel("events-changes")
-    .on("postgres_changes", { event: "*", schema: "public", table: "events" }, (payload) => {
-      if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-        const ev = rowToEvent(payload.new);
-        const idx = state.events.findIndex(e => e.id === ev.id);
-        if (idx >= 0) state.events[idx] = ev;
-        else state.events.push(ev);
-      } else if (payload.eventType === "DELETE") {
-        state.events = state.events.filter(e => e.id !== payload.old.id);
-      }
-      renderCalendar();
-      if (activeTab() === "vacations") renderVacations();
-    })
-    .subscribe();
 }
 
 function setSyncStatus(kind, text) {
