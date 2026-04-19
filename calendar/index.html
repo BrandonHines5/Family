@@ -190,6 +190,7 @@
   })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" async></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" async></script>
 <script>
 // ---------- Supabase config (inline so there's no separate file to cache) ----------
 window.FAMILY_CAL_CONFIG = {
@@ -214,7 +215,7 @@ const SUPABASE_CONFIGURED =
 
 let supabase = null;
 
-async function waitForSupabaseLib(timeoutMs = 4000) {
+async function waitForSupabaseLib(timeoutMs = 12000) {
   if (window.supabase && window.supabase.createClient) return true;
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
