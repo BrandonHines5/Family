@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hines Family Calendar</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="app-header">
+  <div class="header-row">
+    <h1>Hines Family Calendar</h1>
+    <span id="sync-status" class="sync-status" data-kind="connecting">Loading…</span>
+  </div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="calendar">Calendar</button>
+    <button class="tab-btn" data-tab="vacations">Vacations</button>
+    <button class="tab-btn" data-tab="suggest">Suggest Trip</button>
+  </nav>
+</header>
+
+<main>
+  <section class="view active" id="view-calendar">
+    <div class="calendar-controls">
+      <button id="prev-month" class="nav-btn">‹</button>
+      <h2 id="month-label"></h2>
+      <button id="next-month" class="nav-btn">›</button>
+      <button id="today-btn" class="secondary">Today</button>
+      <button id="new-event-btn" class="primary">+ New Event</button>
+    </div>
+
+    <div class="filters">
+      <span class="filter-label">Show:</span>
+      <label class="member-chip"><input type="checkbox" class="filter-member" value="Brandon" checked /><span class="chip c-brandon">Brandon</span></label>
+      <label class="member-chip"><input type="checkbox" class="filter-member" value="Kelly" checked /><span class="chip c-kelly">Kelly</span></label>
+      <label class="member-chip"><input type="checkbox" class="filter-member" value="Montgomery" checked /><span class="chip c-montgomery">Montgomery</span></label>
+      <label class="member-chip"><input type="checkbox" class="filter-member" value="Justice" checked /><span class="chip c-justice">Justice</span></label>
+      <label class="member-chip"><input type="checkbox" class="filter-member" value="Valor" checked /><span class="chip c-valor">Valor</span></label>
+      <span class="filter-sep"></span>
+      <label class="status-toggle"><input type="checkbox" id="filter-confirmed" checked /> Confirmed</label>
+      <label class="status-toggle"><input type="checkbox" id="filter-prospective" checked /> Prospective</label>
+    </div>
+
+    <div class="weekday-row">
+      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+    </div>
+    <div class="calendar-grid" id="calendar-grid"></div>
+  </section>
+
+  <section class="view" id="view-vacations">
+    <div class="section-header">
+      <h2>Vacations</h2>
+      <button id="new-vacation-btn" class="primary">+ New Vacation</button>
+    </div>
+    <div id="vacation-list"></div>
+  </section>
+
+  <section class="view" id="view-suggest">
+    <h2>Suggest Trip Dates</h2>
+    <p class="muted">Find date windows where travelers have no confirmed conflicts.</p>
+    <div class="suggest-form">
+      <div class="field">
+        <label>Who's going?</label>
+        <label class="status-toggle"><input type="checkbox" id="suggest-everyone" /> Everyone</label>
+        <div class="member-toggles" id="suggest-members"></div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Trip length (days)</label>
+          <input type="number" id="suggest-duration" min="1" max="60" value="5" />
+        </div>
+        <div class="field">
+          <label>Earliest date</label>
+          <input type="date" id="suggest-start" />
+        </div>
+        <div class="field">
+          <label>Latest date</label>
+          <input type="date" id="suggest-end" />
+        </div>
+      </div>
+      <div class="field">
+        <label class="status-toggle"><input type="checkbox" id="suggest-avoid-prospective" /> Also avoid prospective events</label>
+      </div>
+      <button id="suggest-run" class="primary">Find Dates</button>
+    </div>
+    <div id="suggest-results"></div>
+  </section>
+</main>
+
+<div class="modal-backdrop" id="event-modal" hidden>
+  <div class="modal">
+    <header class="modal-header">
+      <h3 id="event-modal-title">New Event</h3>
+      <button class="close-btn" id="event-close" type="button">×</button>
+    </header>
+    <form id="event-form">
+      <input type="hidden" id="event-id" />
+
+      <div class="field">
+        <label>Title</label>
+        <input type="text" id="event-title" required placeholder="e.g. Soccer practice" />
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Type</label>
+          <select id="event-type">
+            <option value="activity">Activity</option>
+            <option value="vacation">Vacation</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="event-status">
+            <option value="confirmed">Confirmed</option>
+            <option value="prospective">Prospective</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Start date</label>
+          <input type="date" id="event-start" required />
+        </div>
+        <div class="field">
+          <label>End date</label>
+          <input type="date" id="event-end" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Who's involved?</label>
+        <label class="status-toggle"><input type="checkbox" id="event-everyone" /> Everyone</label>
+        <div class="member-toggles" id="event-members"></div>
+      </div>
+
+      <fieldset id="vacation-fields" class="vacation-fields" hidden>
+        <legend>Vacation Details</legend>
+
+        <div class="field">
+          <label>Flights</label>
+          <div id="flights-list"></div>
+          <button type="button" class="secondary small" id="add-flight">+ Add flight</button>
+        </div>
+
+        <div class="field">
+          <label>Car rental</label>
+          <input type="text" id="v-car" placeholder="Company, confirmation #, pickup/dropoff" />
+        </div>
+
+        <div class="field">
+          <label>Hotel</label>
+          <input type="text" id="v-hotel" placeholder="Name, confirmation #, check-in/out" />
+        </div>
+
+        <div class="field">
+          <label>Who's watching the kids staying home?</label>
+          <input type="text" id="v-kids-care" placeholder="e.g. Grandma has Valor at her house" />
+        </div>
+
+        <div class="field">
+          <label>Who's watching Sable?</label>
+          <input type="text" id="v-sable" placeholder="e.g. Boarding at Paws Inn" />
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label>Notes</label>
+        <textarea id="event-notes" rows="3"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="danger" id="event-delete" hidden>Delete</button>
+        <button type="button" class="secondary" id="event-cancel">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
