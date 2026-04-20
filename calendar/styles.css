@@ -339,6 +339,11 @@ button.small { padding: 4px 8px; font-size: 12px; }
   min-width: 140px;
   color: var(--muted);
 }
+.vacation-card .needed {
+  color: var(--danger);
+  font-weight: 600;
+  font-style: italic;
+}
 .status-tag {
   font-size: 11px;
   padding: 2px 8px;
