@@ -260,6 +260,11 @@ button.small { padding: 4px 8px; font-size: 12px; }
 .event-pill.vacation {
   font-weight: 700;
 }
+.event-pill.imported {
+  background: #f4f4f8;
+  border-left-color: #9aa1b4;
+  color: #3d3f4a;
+}
 .event-pill .dots {
   display: inline-flex;
   gap: 2px;
