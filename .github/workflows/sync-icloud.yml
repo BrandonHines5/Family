@@ -1,0 +1,23 @@
+name: Sync iCloud calendars
+
+on:
+  schedule:
+    - cron: "7 * * * *"   # every hour at :07
+  workflow_dispatch:       # also runnable on demand from the Actions tab
+  push:
+    branches: [main]
+    paths:
+      - "scripts/ical-feeds.json"
+      - "scripts/sync-icloud.mjs"
+      - ".github/workflows/sync-icloud.yml"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run sync
+        run: node scripts/sync-icloud.mjs
