@@ -779,18 +779,33 @@ function renderVacationCard(v) {
   const vac = v.vacation || {};
 
   const detailRows = [];
-  if (vac.flights && vac.flights.length) {
-    detailRows.push('<div class="detail-row"><div class="label">Flights</div><div>' +
-      vac.flights.map(f => escapeHtml(f.detail)).join("<br>") + '</div></div>');
+  const needed = (label) => '<span class="needed">' + label + ' Needed</span>';
+
+  detailRows.push('<div class="detail-row"><div class="label">Flights</div><div>' +
+    (vac.flights && vac.flights.length
+      ? vac.flights.map(f => escapeHtml(f.detail)).join("<br>")
+      : needed("Flights")) +
+    '</div></div>');
+
+  detailRows.push('<div class="detail-row"><div class="label">Car rental</div><div>' +
+    (vac.carRental ? escapeHtml(vac.carRental) : needed("Car Rental")) +
+    '</div></div>');
+
+  detailRows.push('<div class="detail-row"><div class="label">Hotel</div><div>' +
+    (vac.hotel ? escapeHtml(vac.hotel) : needed("Hotel")) +
+    '</div></div>');
+
+  if (notGoing.length) {
+    detailRows.push('<div class="detail-row"><div class="label">Kids staying home</div><div><strong>' +
+      notGoing.join(", ") + '</strong> — ' +
+      (vac.kidsCare ? escapeHtml(vac.kidsCare) : needed("Kid Care")) +
+      '</div></div>');
   }
-  if (vac.carRental) detailRows.push('<div class="detail-row"><div class="label">Car rental</div><div>' + escapeHtml(vac.carRental) + '</div></div>');
-  if (vac.hotel) detailRows.push('<div class="detail-row"><div class="label">Hotel</div><div>' + escapeHtml(vac.hotel) + '</div></div>');
-  if (notGoing.length && vac.kidsCare) {
-    detailRows.push('<div class="detail-row"><div class="label">Kids staying home</div><div><strong>' + notGoing.join(", ") + '</strong> — ' + escapeHtml(vac.kidsCare) + '</div></div>');
-  } else if (notGoing.length) {
-    detailRows.push('<div class="detail-row"><div class="label">Kids staying home</div><div>' + notGoing.join(", ") + ' — <em>care not yet arranged</em></div></div>');
-  }
-  if (vac.sableCare) detailRows.push('<div class="detail-row"><div class="label">Sable\'s care</div><div>' + escapeHtml(vac.sableCare) + '</div></div>');
+
+  detailRows.push('<div class="detail-row"><div class="label">Sable\'s care</div><div>' +
+    (vac.sableCare ? escapeHtml(vac.sableCare) : needed("Sable Care")) +
+    '</div></div>');
+
   if (v.notes) detailRows.push('<div class="detail-row"><div class="label">Notes</div><div>' + escapeHtml(v.notes) + '</div></div>');
 
   card.innerHTML =
