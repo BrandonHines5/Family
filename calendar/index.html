@@ -510,7 +510,7 @@ function renderCalendar() {
 
 function renderEventPill(ev) {
   const pill = document.createElement("div");
-  pill.className = "event-pill " + ev.status + (ev.type === "vacation" ? " vacation" : "");
+  pill.className = "event-pill " + ev.status + (ev.type === "vacation" ? " vacation" : "") + (isImportedEvent(ev) ? " imported" : "");
   const dots = document.createElement("span");
   dots.className = "dots";
   ev.members.forEach(m => {
@@ -521,9 +521,9 @@ function renderEventPill(ev) {
   });
   pill.appendChild(dots);
   pill.appendChild(document.createTextNode(
-    (ev.type === "vacation" ? "✈ " : "") + ev.title
+    (ev.type === "vacation" ? "✈ " : (isImportedEvent(ev) ? "🍎 " : "")) + ev.title
   ));
-  pill.title = ev.title + "\n" + formatDateRange(ev.startDate, ev.endDate) + "\n" + ev.members.join(", ") + "\n" + ev.status;
+  pill.title = ev.title + "\n" + formatDateRange(ev.startDate, ev.endDate) + "\n" + ev.members.join(", ") + "\n" + ev.status + (isImportedEvent(ev) ? "\n(From Apple Calendar)" : "");
   pill.addEventListener("click", (e) => {
     e.stopPropagation();
     openEventModal({ event: ev });
@@ -607,6 +607,37 @@ function addFlightRow(flight) {
 
 function escapeAttr(s) { return String(s).replace(/"/g, "&quot;"); }
 
+function isImportedEvent(ev) {
+  return !!(ev && typeof ev.id === "string" && ev.id.startsWith("ical-"));
+}
+
+function setModalReadOnly(readOnly) {
+  const inputs = form.querySelectorAll("input, select, textarea, button.remove-flight, #add-flight");
+  inputs.forEach(el => {
+    if (el.type === "checkbox") el.disabled = readOnly;
+    else if (el.tagName === "BUTTON") el.disabled = readOnly;
+    else el.readOnly = readOnly;
+    if (el.tagName === "SELECT") el.disabled = readOnly;
+  });
+  const saveBtn = form.querySelector('button[type="submit"]');
+  if (saveBtn) saveBtn.hidden = readOnly;
+  deleteBtn.hidden = readOnly || !document.getElementById("event-id").value;
+
+  let banner = document.getElementById("readonly-banner");
+  if (readOnly) {
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "readonly-banner";
+      banner.style.cssText = "background:#eaf1ff;border:1px solid #b9cbff;color:#1e3a8a;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:13px;";
+      form.insertBefore(banner, form.firstChild);
+    }
+    banner.textContent = "From Apple Calendar — edit it in Calendar.app. Changes here won't stick; the next hourly sync will overwrite them.";
+    banner.hidden = false;
+  } else if (banner) {
+    banner.hidden = true;
+  }
+}
+
 function openEventModal(opts) {
   opts = opts || {};
   const event = opts.event;
@@ -617,7 +648,8 @@ function openEventModal(opts) {
   form.reset();
   flightsList.innerHTML = "";
   deleteBtn.hidden = !event;
-  modalTitle.textContent = event ? "Edit Event" : "New Event";
+  const readOnly = isImportedEvent(event);
+  modalTitle.textContent = readOnly ? "Apple Calendar Event" : (event ? "Edit Event" : "New Event");
 
   if (event) {
     document.getElementById("event-id").value = event.id;
@@ -648,6 +680,7 @@ function openEventModal(opts) {
     typeSelect.value = "activity";
   }
   vacationFields.hidden = typeSelect.value !== "vacation";
+  setModalReadOnly(readOnly);
   modal.hidden = false;
   modal.style.display = "";
 }
