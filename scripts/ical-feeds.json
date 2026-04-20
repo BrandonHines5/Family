@@ -1,0 +1,10 @@
+{
+  "$comment": "Each feed can specify either `person` (tags events with a single family member) or `members` (tags events with a list — use this for shared family calendars). `label` is used to namespace event IDs so re-syncs overwrite cleanly.",
+  "feeds": [
+    {
+      "label": "kelly-family",
+      "members": ["Brandon", "Kelly", "Montgomery", "Justice", "Valor"],
+      "url": "webcal://p64-caldav.icloud.com/published/2/MTM0OTM3MTcwNTEzNDkzN0_gE-JADGu8IbyUqeTDwZ9u-Avo9KkfYoAGu2XC48WqdVbPwiimqAbk5r922qvq-py-6HFDng_rbKuPoBgCv1E"
+    }
+  ]
+}
